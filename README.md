@@ -1,36 +1,82 @@
-# SMS (Script Management System) - Requirements & Plan
+# SMS (Script Management System)
+
+Git-backed alias system for managing scripts. Run scripts by stable alias regardless of file location.
+
+## Installation
+
+```bash
+# Clone or copy this repository
+git clone <repo>
+cd sms-cli
+
+# Install dependencies
+bun install
+
+# Optional: Create symlink for global access
+ln -sf "$(pwd)/sms.ts" ~/.local/bin/sms
+```
+
+## Quick Start
+
+```bash
+# Add a script with an alias
+sms add ./myscript.py --alias etl
+
+# Run it from anywhere
+sms run etl --input data.csv
+
+# Move it to organize
+sms mv etl utils/
+
+# List all scripts
+sms list
+
+# Check for issues
+sms doctor
+```
 
 ## Problem Statement
 
 Local script execution is fragile:
-1. **Fragile Paths**: Scripts break when moved (`./old_proj/v2/etl.py` → `./analytics/etl.py`)
+1. **Fragile Paths**: Scripts break when moved (`./old_proj/v2/etl.py` -> `./analytics/etl.py`)
 2. **Hard to Manage**: No central registry, scripts scattered across projects
 3. **No Versioning**: Accidental overwrites, no history of changes
 
-**Out of Scope**: Environment/dependency management (Phase 2). This version focuses purely on **path abstraction** and **git tracking**.
+## Features
 
----
+- **Git-backed**: Every change is committed to `~/.sms/` repository
+- **Path abstraction**: Scripts are referenced by alias, not file path
+- **Auto-detection**: Automatically detects bash/python scripts
+- **Health checks**: Built-in `doctor` command detects broken paths
 
-## 2-Phase Implementation Plan
+## Commands
 
-### Phase 1: Git-Backed Alias System (Day 1)
-**Goal**: Run scripts by stable alias regardless of file location.
+| Command | Description |
+|---------|-------------|
+| `sms add <file> --alias <name>` | Add a script with an alias |
+| `sms run <alias> [args...]` | Execute a script by alias |
+| `sms mv <alias> <folder>/` | Move script to subfolder |
+| `sms rm <alias>` | Remove a script |
+| `sms list` | Show all registered scripts |
+| `sms doctor` | Detect broken paths |
+| `sms help` | Show help |
 
-**Core Mechanism**:
-- Single git repository at `~/.sms/`
-- `index.json` maps aliases → relative paths
-- Moving files updates the index, not your muscle memory
+## Implementation
 
-**Deliverables**:
-- `sms add &lt;file&gt; --alias &lt;name&gt;`: Copy to repo, create alias, commit
-- `sms run &lt;alias&gt;`: Lookup path in index, execute with bash/python
-- `sms mv &lt;alias&gt; &lt;new-folder&gt;/`: Update path in index, commit
-- `sms rm &lt;alias&gt;`: Remove script and index entry
+Built with Bun + TypeScript.
 
-### Phase 2: Sync & Discovery (Day 2)
-**Goal**: prevent broken links.
+- `sms.ts` - Main CLI implementation
+- `types.ts` - Type definitions
+- `~/.sms/index.json` - Maps aliases to relative paths
+- `~/.sms/scripts/` - Script storage
 
-**Deliverables**:
-- `sms list`: Show all aliases with their actual paths
-- `sms doctor`: Detect broken paths (file moved outside sms), suggest fixes
+## Project Structure
 
+```
+~/.sms/
+├── .git/           # Git repository
+├── index.json      # Alias mappings
+└── scripts/        # Script storage
+```
+
+Each operation is automatically committed to git, providing full history of changes.

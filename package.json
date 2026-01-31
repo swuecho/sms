@@ -1,0 +1,19 @@
+{
+  "name": "sms-cli",
+  "version": "1.0.0",
+  "description": "Script Management System - Git-backed alias system for scripts",
+  "main": "sms.ts",
+  "bin": {
+    "sms": "./sms.ts"
+  },
+  "scripts": {
+    "start": "bun sms.ts",
+    "build": "bun build sms.ts --outfile=sms --compile"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  }
+}
