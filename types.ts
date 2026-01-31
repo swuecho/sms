@@ -2,6 +2,7 @@
 
 export interface ScriptEntry {
   path: string;           // Relative path within ~/.sms/scripts/
+  sourcePath?: string;    // Original source path (for updates)
   description?: string;   // Optional description
   addedAt: string;        // ISO timestamp
   updatedAt: string;      // ISO timestamp

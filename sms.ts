@@ -182,6 +182,7 @@ function addCommand(filePath: string, alias?: string): void {
   const now = new Date().toISOString();
   index.scripts[targetAlias] = {
     path: targetFileName,
+    sourcePath: resolvedPath,
     addedAt: now,
     updatedAt: now,
   };
@@ -266,6 +267,68 @@ function rmCommand(alias: string): void {
 
   commitChanges(`Remove script '${alias}'`);
   console.log(`Removed '${alias}'`);
+}
+
+function updateCommand(alias: string): void {
+  ensureSmsRepo();
+
+  const index = loadIndex();
+  const entry = index.scripts[alias];
+
+  if (!entry) {
+    console.error(`Error: Unknown alias '${alias}'`);
+    console.error(`Run 'sms list' to see available scripts`);
+    process.exit(1);
+  }
+
+  if (!entry.sourcePath) {
+    console.error(`Error: No source path recorded for '${alias}'`);
+    console.error(`This script was added before update tracking was available.`);
+    console.error(`To update: remove the script and re-add it from the new source.`);
+    process.exit(1);
+  }
+
+  if (!fs.existsSync(entry.sourcePath)) {
+    console.error(`Error: Source file not found: ${entry.sourcePath}`);
+    console.error(`The original file may have been moved or deleted.`);
+    process.exit(1);
+  }
+
+  const targetPath = path.join(SCRIPTS_DIR, entry.path);
+
+  // Copy updated file
+  fs.copyFileSync(entry.sourcePath, targetPath);
+
+  // Update timestamp
+  entry.updatedAt = new Date().toISOString();
+  saveIndex(index);
+
+  commitChanges(`Update script '${alias}' from ${entry.sourcePath}`);
+  console.log(`Updated '${alias}' from ${entry.sourcePath}`);
+}
+
+function showCommand(alias: string): void {
+  ensureSmsRepo();
+
+  const index = loadIndex();
+  const entry = index.scripts[alias];
+
+  if (!entry) {
+    console.error(`Error: Unknown alias '${alias}'`);
+    console.error(`Run 'sms list' to see available scripts`);
+    process.exit(1);
+  }
+
+  const scriptPath = path.join(SCRIPTS_DIR, entry.path);
+
+  if (!fs.existsSync(scriptPath)) {
+    console.error(`Error: Script file not found: ${entry.path}`);
+    console.error(`Run 'sms doctor' to check for issues`);
+    process.exit(1);
+  }
+
+  const content = fs.readFileSync(scriptPath, "utf-8");
+  console.log(content);
 }
 
 function listCommand(): void {
@@ -380,7 +443,7 @@ function completionCommand(shell?: string): void {
   prev="\${COMP_WORDS[COMP_CWORD-1]}"
 
   # Main commands
-  local commands="add run mv rm list doctor help completion"
+  local commands="add run mv rm update show list doctor help completion"
 
   # Complete based on position
   if [ $COMP_CWORD -eq 1 ]; then
@@ -392,7 +455,7 @@ function completionCommand(shell?: string): void {
   local cmd="\${COMP_WORDS[1]}"
 
   case "\${cmd}" in
-    run|rm)
+    run|rm|update|show)
       # Complete with aliases
       local aliases=$(${scriptName} completion --aliases 2>/dev/null || echo "")
       COMPREPLY=( $(compgen -W "\${aliases}" -- \${cur}) )
@@ -441,6 +504,8 @@ _${scriptName}() {
         'run:Run a script by alias'
         'mv:Move script to subfolder'
         'rm:Remove a script'
+        'update:Update a script from source'
+        'show:Show script contents'
         'list:List all scripts'
         'doctor:Check for broken paths'
         'help:Show help'
@@ -450,7 +515,7 @@ _${scriptName}() {
       ;;
     args)
       case "\$line[1]" in
-        run|rm)
+        run|rm|update|show)
           local aliases=($(${scriptName} completion --aliases 2>/dev/null || echo ""))
           _describe -t aliases 'aliases' aliases
           ;;
@@ -482,12 +547,14 @@ complete -c ${scriptName} -n '__fish_use_subcommand' -a 'add' -d 'Add a script w
 complete -c ${scriptName} -n '__fish_use_subcommand' -a 'run' -d 'Run a script by alias'
 complete -c ${scriptName} -n '__fish_use_subcommand' -a 'mv' -d 'Move script to subfolder'
 complete -c ${scriptName} -n '__fish_use_subcommand' -a 'rm' -d 'Remove a script'
+complete -c ${scriptName} -n '__fish_use_subcommand' -a 'update' -d 'Update a script from source'
+complete -c ${scriptName} -n '__fish_use_subcommand' -a 'show' -d 'Show script contents'
 complete -c ${scriptName} -n '__fish_use_subcommand' -a 'list' -d 'List all scripts'
 complete -c ${scriptName} -n '__fish_use_subcommand' -a 'doctor' -d 'Check for broken paths'
 complete -c ${scriptName} -n '__fish_use_subcommand' -a 'help' -d 'Show help'
 complete -c ${scriptName} -n '__fish_use_subcommand' -a 'completion' -d 'Generate shell completion'
 
-complete -c ${scriptName} -n '__fish_seen_subcommand_from run rm' -a "(${scriptName} completion --aliases 2>/dev/null)"
+complete -c ${scriptName} -n '__fish_seen_subcommand_from run rm update show' -a "(${scriptName} completion --aliases 2>/dev/null)"
 complete -c ${scriptName} -n '__fish_seen_subcommand_from mv; and __fish_is_token_n 3' -a "(${scriptName} completion --aliases 2>/dev/null)"
 complete -c ${scriptName} -n '__fish_seen_subcommand_from add; and __fish_is_token_n 3' -F`;
 
@@ -541,6 +608,8 @@ Usage:
   sms run <alias> [args...]         Run a script by alias
   sms mv <alias> <folder>/          Move script to subfolder
   sms rm <alias>                   Remove a script
+  sms update <alias>               Update script from original source
+  sms show <alias>                 Show script contents
   sms list                         List all scripts
   sms doctor                       Check for broken paths
   sms completion <shell>           Generate shell completion (bash/zsh/fish)
@@ -553,8 +622,10 @@ Setup Autocomplete:
 Examples:
   sms add ./myscript.py --alias etl
   sms run etl --input data.csv
+  sms show etl
   sms mv etl utils/
   sms rm etl
+  sms update etl
 `);
 }
 
@@ -615,6 +686,28 @@ function main(): void {
           process.exit(1);
         }
         rmCommand(alias);
+        break;
+      }
+
+      case "update": {
+        const alias = args[1];
+        if (!alias) {
+          console.error("Error: Missing alias");
+          console.error("Usage: sms update <alias>");
+          process.exit(1);
+        }
+        updateCommand(alias);
+        break;
+      }
+
+      case "show": {
+        const alias = args[1];
+        if (!alias) {
+          console.error("Error: Missing alias");
+          console.error("Usage: sms show <alias>");
+          process.exit(1);
+        }
+        showCommand(alias);
         break;
       }
 
