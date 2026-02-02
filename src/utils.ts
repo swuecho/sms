@@ -62,10 +62,9 @@ export function commitChanges(message: string): void {
   }
 }
 
-export function getScriptType(filePath: string): "bash" | "python" | "bun" | "unknown" {
+export function getScriptType(filePath: string): "python" | "bun" | "unknown" {
   const ext = path.extname(filePath).toLowerCase();
   if (ext === ".py") return "python";
-  if (ext === ".sh" || ext === ".bash") return "bash";
   if (ext === ".ts") return "bun";
 
   // Check shebang
@@ -73,7 +72,6 @@ export function getScriptType(filePath: string): "bash" | "python" | "bun" | "un
     const content = fs.readFileSync(filePath, "utf-8");
     const firstLine = content.split("\n")[0] || "";
     if (firstLine.includes("python")) return "python";
-    if (firstLine.includes("bash") || firstLine.includes("/sh")) return "bash";
     if (firstLine.includes("bun")) return "bun";
   } catch {
     // ignore
@@ -104,8 +102,6 @@ export function executeScript(
   let command: string;
   if (type === "python") {
     command = `python3 "${fullPath}"`;
-  } else if (type === "bash") {
-    command = `bash "${fullPath}"`;
   } else if (type === "bun") {
     command = `bun "${fullPath}"`;
   } else {

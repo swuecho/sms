@@ -86,7 +86,7 @@ export function addCommand(filePath: string, alias?: string, env?: Record<string
 
 export function initCommand(
   name: string,
-  type: "bash" | "python" | "ts",
+  type: "python" | "ts",
   alias?: string,
   location: "cwd" | "sms" = "cwd",
   addToSms: boolean = true,
@@ -439,7 +439,7 @@ export function completionCommand(shell?: string): void {
     `      ;;`,
     `    init)`,
     `      if [ "\${prev}" == "--type" ]; then`,
-    `        COMPREPLY=( $(compgen -W "bash python ts" -- \${cur}) )`,
+    `        COMPREPLY=( $(compgen -W "python ts" -- \${cur}) )`,
     `      fi`,
     `      ;;`,
     `    *)`,
@@ -493,7 +493,7 @@ export function completionCommand(shell?: string): void {
     `          fi`,
     `          ;;`,
     `        init)`,
-    `          _arguments '--type[Template type]:type:(bash python ts)'`,
+    `          _arguments '--type[Template type]:type:(python ts)'`,
     `          ;;`,
     `      esac`,
     `      ;;`,
@@ -576,7 +576,7 @@ Usage:
   sms edit <alias>                 Edit a script in $EDITOR
   sms list                         List all scripts
   sms doctor                       Check for broken paths
-  sms init <name> --type <bash|python|ts> [--alias <name>] [--location <cwd|sms>] [--no-add] [--force]
+  sms init <name> --type <python|ts> [--alias <name>] [--location <cwd|sms>] [--no-add] [--force]
   sms completion <shell>           Generate shell completion (bash/zsh/fish)
   sms help                         Show this help
 

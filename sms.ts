@@ -119,11 +119,11 @@ function main(): void {
         const typeRaw = typeIdx > 0 ? args[typeIdx + 1] : undefined;
         if (!name || !typeRaw) {
           console.error("Error: Missing name or --type");
-          console.error("Usage: sms init <name> --type <bash|python|ts> [--alias <name>] [--location <cwd|sms>] [--no-add] [--force]");
+          console.error("Usage: sms init <name> --type <python|ts> [--alias <name>] [--location <cwd|sms>] [--no-add] [--force]");
           process.exit(1);
         }
-        if (typeRaw !== "bash" && typeRaw !== "python" && typeRaw !== "ts") {
-          console.error("Error: Invalid --type (use bash|python|ts)");
+        if (typeRaw !== "python" && typeRaw !== "ts") {
+          console.error("Error: Invalid --type (use python|ts)");
           process.exit(2);
         }
         const aliasIdx = args.indexOf("--alias");

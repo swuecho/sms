@@ -7,67 +7,14 @@ import * as fs from "fs";
 import * as path from "path";
 import { SCRIPTS_DIR } from "./config";
 
-export function resolveTemplateName(name: string, type: "bash" | "python" | "ts"): string {
+export function resolveTemplateName(name: string, type: "python" | "ts"): string {
   const ext = path.extname(name);
   if (ext) return name;
-  if (type === "bash") return `${name}.sh`;
   if (type === "python") return `${name}.py`;
   return `${name}.ts`;
 }
 
-export function templateFor(type: "bash" | "python" | "ts", scriptName: string): string {
-  if (type === "bash") {
-    return [
-      `#!/usr/bin/env bash`,
-      `set -euo pipefail`,
-      ``,
-      `usage() {`,
-      `  cat <<'EOF'`,
-      `Usage:`,
-      `  ${scriptName} [options] <input>`,
-      ``,
-      `Options:`,
-      `  -o, --output <path>   Output file (default: stdout)`,
-      `  -h, --help            Show this help`,
-      `EOF`,
-      `}`,
-      ``,
-      `output=""`,
-      ``,
-      `while [[ $# -gt 0 ]]; do`,
-      `  case "$1" in`,
-      `    -o|--output)`,
-      `      output="${'${2:-}'}"`,
-      `      shift 2`,
-      `      ;;`,
-      `    -h|--help)`,
-      `      usage`,
-      `      exit 0`,
-      `      ;;`,
-      `    -*)`,
-      `      echo "Error: Unknown option $1" >&2`,
-      `      usage >&2`,
-      `      exit 2`,
-      `      ;;`,
-      `    *)`,
-      `      break`,
-      `      ;;`,
-      `  esac`,
-      `done`,
-      ``,
-      `input="${'${1:-}'}"`,
-      `if [[ -z "$input" ]]; then`,
-      `  echo "Error: Missing <input>" >&2`,
-      `  usage >&2`,
-      `  exit 2`,
-      `fi`,
-      ``,
-      `# Core logic here`,
-      `echo "input=$input"`,
-      ``
-    ].join("\n");
-  }
-
+export function templateFor(type: "python" | "ts", scriptName: string): string {
   if (type === "python") {
     return [
       `#!/usr/bin/env python3`,
