@@ -8,7 +8,8 @@
   },
   "scripts": {
     "start": "bun sms.ts",
-    "build": "bun build sms.ts --outfile=sms --compile"
+    "build": "bun build sms.ts --outfile=sms --compile",
+    "test": "bun test"
   },
   "devDependencies": {
     "@types/bun": "latest"
