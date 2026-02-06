@@ -133,7 +133,7 @@ export function initCommand(
   }
 }
 
-export function runCommand(alias: string, args: string[]): void {
+export function runCommand(alias: string, args: string[], dryRun: boolean = false): void {
   ensureSmsRepo();
 
   const index = loadIndex();
@@ -145,7 +145,7 @@ export function runCommand(alias: string, args: string[]): void {
     process.exit(1);
   }
 
-  executeScript(entry.path, args, entry.env);
+  executeScript(entry.path, args, entry.env, dryRun);
 }
 
 export function rmCommand(alias: string): void {
@@ -399,56 +399,43 @@ export function doctorCommand(): void {
   }
 }
 
+export function llmCommand(): void {
+  console.log(`SMS LLM Guide
+=============
+
+Use SMS to register scripts by alias and run them from anywhere.
+
+Core commands:
+  sms add <file> --alias <name> [--env "K=V,FOO=BAR"]
+  sms run [--dry-run] <alias> [args...]
+  sms update <alias> [--env "K=V,FOO=BAR"]
+  sms show <alias>
+  sms rm <alias>
+  sms list
+  sms doctor
+  sms init <name> --type <python|ts> [--alias <name>] [--location <cwd|sms>] [--no-add] [--force]
+
+Runtime behavior:
+  - Python scripts run with: uv run <script>
+  - TypeScript scripts run with: bun <script>
+  - Arguments after alias are passed through unchanged.
+  - --dry-run prints the resolved command and env overrides without executing.
+
+Script authoring guidance:
+  - Prefer Python or TypeScript only.
+  - Include clear CLI args and --help output.
+  - Return exit code 2 for argument/usage errors.
+  - For Python, prefer PEP 723 metadata headers for dependencies.
+
+Examples:
+  sms init etl --type python --alias etl
+  sms run --dry-run etl --input data.csv
+  sms run etl --input data.csv
+  sms update etl`);
+}
+
 export function completionCommand(shell?: string): void {
   const scriptName = "sms";
-
-  // Bash completion
-  const bashCompletion = [
-    `_${scriptName}_complete() {`,
-    `  local cur prev opts`,
-    `  COMPREPLY=()`,
-    `  cur="\${COMP_WORDS[COMP_CWORD]}"`,
-    `  prev="\${COMP_WORDS[COMP_CWORD-1]}"`,
-    ``,
-    `  # Main commands`,
-    `  local commands="add run rm update show edit list doctor init help completion"`,
-    ``,
-    `  # Complete based on position`,
-    `  if [ $COMP_CWORD -eq 1 ]; then`,
-    `    COMPREPLY=( $(compgen -W "\${commands}" -- \${cur}) )`,
-    `    return 0`,
-    `  fi`,
-    ``,
-    `  # Complete subcommand arguments`,
-    `  local cmd="\${COMP_WORDS[1]}"`,
-    ``,
-    `  case "\${cmd}" in`,
-    `    run|rm|update|show|edit)`,
-    `      # Complete with aliases`,
-    `      local aliases=$(${scriptName} completion --aliases 2>/dev/null || echo "")`,
-    `      COMPREPLY=( $(compgen -W "\${aliases}" -- \${cur}) )`,
-    `      ;;`,
-    `    add)`,
-    `      if [ $COMP_CWORD -eq 2 ]; then`,
-    `        # File completion`,
-    `        COMPREPLY=( $(compgen -f -- \${cur}) )`,
-    `      elif [ "\${prev}" == "--alias" ]; then`,
-    `        # No completion for alias name`,
-    `        COMPREPLY=()`,
-    `      fi`,
-    `      ;;`,
-    `    init)`,
-    `      if [ "\${prev}" == "--type" ]; then`,
-    `        COMPREPLY=( $(compgen -W "python ts" -- \${cur}) )`,
-    `      fi`,
-    `      ;;`,
-    `    *)`,
-    `      COMPREPLY=()`,
-    `      ;;`,
-    `  esac`,
-    `}`,
-    `complete -F _${scriptName}_complete ${scriptName}`
-  ].join("\n");
 
   // Zsh completion
   const zshCompletion = [
@@ -473,6 +460,7 @@ export function completionCommand(shell?: string): void {
     `        'edit:Edit a script in $EDITOR'`,
     `        'list:List all scripts'`,
     `        'doctor:Check for broken paths'`,
+    `        'llm:Show LLM usage guide'`,
     `        'init:Create a script template'`,
     `        'help:Show help'`,
     `        'completion:Generate shell completion'`,
@@ -514,6 +502,7 @@ export function completionCommand(shell?: string): void {
     `complete -c ${scriptName} -n '__fish_use_subcommand' -a 'edit' -d 'Edit a script in $EDITOR'`,
     `complete -c ${scriptName} -n '__fish_use_subcommand' -a 'list' -d 'List all scripts'`,
     `complete -c ${scriptName} -n '__fish_use_subcommand' -a 'doctor' -d 'Check for broken paths'`,
+    `complete -c ${scriptName} -n '__fish_use_subcommand' -a 'llm' -d 'Show LLM usage guide'`,
     `complete -c ${scriptName} -n '__fish_use_subcommand' -a 'init' -d 'Create a script template'`,
     `complete -c ${scriptName} -n '__fish_use_subcommand' -a 'help' -d 'Show help'`,
     `complete -c ${scriptName} -n '__fish_use_subcommand' -a 'completion' -d 'Generate shell completion'`,
@@ -527,8 +516,6 @@ export function completionCommand(shell?: string): void {
     ensureSmsRepo();
     const aliases = getAliases();
     console.log(aliases.join(" "));
-  } else if (shell === "bash") {
-    console.log(bashCompletion);
   } else if (shell === "zsh") {
     console.log(zshCompletion);
   } else if (shell === "fish") {
@@ -537,14 +524,6 @@ export function completionCommand(shell?: string): void {
     // Default: show all with instructions
     console.log(`Shell Completion Setup
 ======================
-
-Bash:
------
-1. Add to ~/.bashrc:
-   eval "$(sms completion bash)"
-
-2. Or save to a file:
-   sms completion bash > /etc/bash_completion.d/sms
 
 Zsh:
 ----
@@ -559,7 +538,7 @@ Fish:
 1. Save to fish completions:
    sms completion fish > ~/.config/fish/completions/sms.fish
 
-Available shells: bash, zsh, fish
+Available shells: zsh, fish
 Usage: sms completion <shell>`);
   }
 }
@@ -569,24 +548,25 @@ export function showHelp(): void {
 
 Usage:
   sms add <file> --alias <name> [--env "K=V,FOO=BAR"]   Add a script with an alias
-  sms run <alias> [args...]        Run a script by alias
+  sms run [--dry-run] <alias> [args...]      Run a script by alias
   sms rm <alias>                   Remove a script
   sms update <alias> [--env "K=V,FOO=BAR"]              Update script from original source
   sms show <alias>                 Show script contents
   sms edit <alias>                 Edit a script in $EDITOR
   sms list                         List all scripts
   sms doctor                       Check for broken paths
+  sms llm                          Show LLM usage guide for SMS
   sms init <name> --type <python|ts> [--alias <name>] [--location <cwd|sms>] [--no-add] [--force]
-  sms completion <shell>           Generate shell completion (bash/zsh/fish)
+  sms completion <shell>           Generate shell completion (zsh/fish)
   sms help                         Show this help
 
 Setup Autocomplete:
-  eval "$(sms completion bash)"     # Add to ~/.bashrc
   eval "$(sms completion zsh)"      # Add to ~/.zshrc
 
 Examples:
   sms add ./myscript.py --alias etl
   sms run etl --input data.csv
+  sms run --dry-run etl --input data.csv
   sms show etl
   sms rm etl
   sms update etl

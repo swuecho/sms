@@ -17,7 +17,7 @@ export function resolveTemplateName(name: string, type: "python" | "ts"): string
 export function templateFor(type: "python" | "ts", scriptName: string): string {
   if (type === "python") {
     return [
-      `#!/usr/bin/env python3`,
+      `#!/usr/bin/env -S uv run --script`,
       `# /// script`,
       `# requires-python = ">=3.11"`,
       `# dependencies = [`,

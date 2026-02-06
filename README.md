@@ -9,6 +9,9 @@ Git-backed alias system for managing scripts. Run scripts by stable alias regard
 git clone <repo>
 cd sms-cli
 
+# Install uv (required for Python scripts)
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
 # Install dependencies
 bun install
 
@@ -24,6 +27,9 @@ sms add ./myscript.py --alias etl
 
 # Run it from anywhere
 sms run etl --input data.csv
+
+# Preview command/env without executing
+sms run --dry-run etl --input data.csv
 
 # List all scripts
 sms list
@@ -43,7 +49,7 @@ Local script execution is fragile:
 
 - **Git-backed**: Every change is committed to `~/.sms/` repository
 - **Path abstraction**: Scripts are referenced by alias, not file path
-- **Auto-detection**: Automatically detects bash/python scripts
+- **Auto-detection**: Automatically detects Python/TypeScript scripts
 - **Health checks**: Built-in `doctor` command detects broken paths
 
 ## Commands
@@ -51,9 +57,10 @@ Local script execution is fragile:
 | Command | Description |
 |---------|-------------|
 | `sms add <file> --alias <name> [--env "K=V,FOO=BAR"]` | Add a script with an alias |
-| `sms run <alias> [args...]` | Execute a script by alias |
+| `sms run [--dry-run] <alias> [args...]` | Execute a script by alias (or print execution plan) |
 | `sms rm <alias>` | Remove a script |
-| `sms init <name> --type <bash|python|ts> [--alias <name>] [--location <cwd|sms>] [--no-add] [--force]` | Create a script template |
+| `sms llm` | Show concise LLM usage guidance for SMS |
+| `sms init <name> --type <python|ts> [--alias <name>] [--location <cwd|sms>] [--no-add] [--force]` | Create a script template |
 | `sms list` | Show all registered scripts |
 | `sms doctor` | Detect broken paths |
 | `sms help` | Show help |
@@ -80,7 +87,7 @@ Most scripts will be authored by an LLM. To keep them reliable, safe, and easy t
 
 ## Expected Script Format (How to Write a Script)
 
-Scripts can be written in Bash, Python, or any executable language. They should follow this structure:
+Scripts should be written in Python or TypeScript. They should follow this structure:
 
 1. **Shebang** (for executable scripts)
 2. **Short description**
@@ -109,66 +116,6 @@ Examples:
 ```
 
 ### Parsing Command Line Input
-
-#### Bash (manual parsing)
-
-```bash
-#!/usr/bin/env bash
-set -euo pipefail
-
-usage() {
-  cat <<'EOF'
-Usage:
-  myscript [options] <input>
-
-Options:
-  -o, --output <path>   Output file (default: stdout)
-  -q, --quiet           Suppress non-error logs
-  -h, --help            Show this help
-EOF
-}
-
-output=""
-quiet="false"
-
-while [[ $# -gt 0 ]]; do
-  case "$1" in
-    -o|--output)
-      output="${2:-}"
-      shift 2
-      ;;
-    -q|--quiet)
-      quiet="true"
-      shift
-      ;;
-    -h|--help)
-      usage
-      exit 0
-      ;;
-    --)
-      shift
-      break
-      ;;
-    -*)
-      echo "Error: Unknown option $1" >&2
-      usage >&2
-      exit 2
-      ;;
-    *)
-      break
-      ;;
-  esac
-done
-
-input="${1:-}"
-if [[ -z "$input" ]]; then
-  echo "Error: Missing <input>" >&2
-  usage >&2
-  exit 2
-fi
-
-# Core logic here
-```
 
 #### Python (argparse)
 
@@ -207,7 +154,9 @@ if __name__ == "__main__":
 ### Notes for `sms`
 
 - `sms run <alias> ...` passes arguments through to your script unchanged.
-- Ensure your script is executable (or has a correct interpreter). For Python, a shebang is recommended.
+- `sms run --dry-run <alias> ...` prints the command and env overrides without executing.
+- Python scripts are executed with `uv run`.
+- TypeScript scripts are executed with Bun.
 
 ### Parameter Guidelines (Best Practices)
 
@@ -223,44 +172,6 @@ Examples:
 ```
 sms run etl --input data.csv --output out.json --limit 100
 cat data.csv | sms run etl --format json
-```
-
-#### Bash stdin vs flags
-
-```bash
-input=""
-format="text"
-
-while [[ $# -gt 0 ]]; do
-  case "$1" in
-    --input)
-      input="${2:-}"
-      shift 2
-      ;;
-    --format)
-      format="${2:-}"
-      shift 2
-      ;;
-    -h|--help)
-      usage
-      exit 0
-      ;;
-    *)
-      echo "Error: Unknown option $1" >&2
-      usage >&2
-      exit 2
-      ;;
-  esac
-done
-
-if [[ -n "$input" ]]; then
-  data="$(cat "$input")"
-else
-  # If no file provided, read stdin
-  data="$(cat)"
-fi
-
-# Process $data with $format
 ```
 
 #### Python stdin vs flags

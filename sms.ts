@@ -15,6 +15,7 @@ import {
   editCommand,
   listCommand,
   doctorCommand,
+  llmCommand,
   completionCommand,
   showHelp,
 } from "./src/commands";
@@ -48,13 +49,15 @@ function main(): void {
       }
 
       case "run": {
-        const alias = args[1];
+        const dryRun = args.includes("--dry-run");
+        const runArgs = args.slice(1).filter((arg) => arg !== "--dry-run");
+        const alias = runArgs[0];
         if (!alias) {
           console.error("Error: Missing alias");
-          console.error("Usage: sms run <alias> [args...]");
+          console.error("Usage: sms run [--dry-run] <alias> [args...]");
           process.exit(1);
         }
-        runCommand(alias, args.slice(2));
+        runCommand(alias, runArgs.slice(1), dryRun);
         break;
       }
 
@@ -111,6 +114,10 @@ function main(): void {
 
       case "doctor":
         doctorCommand();
+        break;
+
+      case "llm":
+        llmCommand();
         break;
 
       case "init": {

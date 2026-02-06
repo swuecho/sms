@@ -82,7 +82,8 @@ export function getScriptType(filePath: string): "python" | "bun" | "unknown" {
 export function executeScript(
   scriptPath: string,
   args: string[],
-  env?: Record<string, string>
+  env?: Record<string, string>,
+  dryRun: boolean = false
 ): void {
   const type = getScriptType(scriptPath);
   const fullPath = path.join(SMS_DIR, "scripts", scriptPath);
@@ -100,17 +101,40 @@ export function executeScript(
   }
 
   let command: string;
+  let commandArgs: string[];
   if (type === "python") {
-    command = `python3 "${fullPath}"`;
+    command = "uv";
+    commandArgs = ["run", fullPath, ...args];
   } else if (type === "bun") {
-    command = `bun "${fullPath}"`;
+    command = "bun";
+    commandArgs = [fullPath, ...args];
   } else {
-    command = `"${fullPath}"`;
+    console.error(`Error: Unsupported script type for ${scriptPath}`);
+    console.error("Only Python (.py/shebang) and TypeScript (.ts/Bun) scripts are supported.");
+    process.exit(2);
   }
 
-  const child = spawn(command, args, {
+  if (dryRun) {
+    const quoteArg = (value: string): string => {
+      if (!value.includes(" ") && !value.includes('"')) return value;
+      return `"${value.replace(/"/g, '\\"')}"`;
+    };
+    const commandLine = [command, ...commandArgs].map(quoteArg).join(" ");
+    console.log("Dry run (no execution):");
+    console.log(`  Command: ${commandLine}`);
+    if (env && Object.keys(env).length > 0) {
+      console.log("  Env overrides:");
+      for (const [key, value] of Object.entries(env)) {
+        console.log(`    ${key}=${value}`);
+      }
+    } else {
+      console.log("  Env overrides: none");
+    }
+    return;
+  }
+
+  const child = spawn(command, commandArgs, {
     stdio: "inherit",
-    shell: true,
     env: { ...process.env, ...(env || {}) },
   });
 
