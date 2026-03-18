@@ -173,6 +173,34 @@ export function rmCommand(alias: string): void {
   console.log(`Removed '${alias}'`);
 }
 
+export function renameCommand(oldAlias: string, newAlias: string): void {
+  ensureSmsRepo();
+
+  const index = loadIndex();
+  const entry = index.scripts[oldAlias];
+
+  if (!entry) {
+    console.error(`Error: Unknown alias '${oldAlias}'`);
+    console.error(`Run 'sms list' to see available scripts`);
+    process.exit(1);
+  }
+
+  if (index.scripts[newAlias]) {
+    console.error(`Error: Alias '${newAlias}' already exists`);
+    process.exit(1);
+  }
+
+  delete index.scripts[oldAlias];
+  index.scripts[newAlias] = {
+    ...entry,
+    updatedAt: new Date().toISOString(),
+  };
+  saveIndex(index);
+
+  commitChanges(`Rename script '${oldAlias}' to '${newAlias}'`);
+  console.log(`Renamed '${oldAlias}' -> '${newAlias}'`);
+}
+
 export function updateCommand(alias: string, env?: Record<string, string>): void {
   ensureSmsRepo();
 
@@ -470,6 +498,7 @@ Use SMS to register scripts by alias and run them from anywhere.
 Core commands:
   sms add <file> --alias <name> [--env "K=V,FOO=BAR"]
   sms run [--dry-run] <alias> [args...]
+  sms rename <old> <new>
   sms update <alias> [--env "K=V,FOO=BAR"] [--clear-env]
   sms env <alias>
   sms show <alias>
@@ -494,6 +523,7 @@ Examples:
   sms init etl --type python --alias etl
   sms run --dry-run etl --input data.csv
   sms run etl --input data.csv
+  sms rename etl etl-prod
   sms update etl
   sms update etl --clear-env
   sms env etl`);
@@ -501,6 +531,7 @@ Examples:
 
 export function completionCommand(shell?: string): void {
   const scriptName = "sms";
+  const homeDir = process.env.HOME;
 
   // Zsh completion
   const zshCompletion = [
@@ -519,6 +550,7 @@ export function completionCommand(shell?: string): void {
     `      local commands=(`,
     `        'add:Add a script with an alias'`,
     `        'run:Run a script by alias'`,
+    `        'rename:Rename a script alias'`,
     `        'rm:Remove a script'`,
     `        'update:Update a script from source'`,
     `        'env:Show script env overrides'`,
@@ -535,7 +567,7 @@ export function completionCommand(shell?: string): void {
     `      ;;`,
     `    args)`,
     `      case "\$line[1]" in`,
-    `        run|rm|update|env|show|edit)`,
+    `        run|rename|rm|update|env|show|edit)`,
     `          local aliases=($(${scriptName} completion --aliases 2>/dev/null || echo ""))`,
     `          _describe -t aliases 'aliases' aliases`,
     `          ;;`,
@@ -562,6 +594,7 @@ export function completionCommand(shell?: string): void {
     `complete -c ${scriptName} -f`,
     `complete -c ${scriptName} -n '__fish_use_subcommand' -a 'add' -d 'Add a script with an alias'`,
     `complete -c ${scriptName} -n '__fish_use_subcommand' -a 'run' -d 'Run a script by alias'`,
+    `complete -c ${scriptName} -n '__fish_use_subcommand' -a 'rename' -d 'Rename a script alias'`,
     `complete -c ${scriptName} -n '__fish_use_subcommand' -a 'rm' -d 'Remove a script'`,
     `complete -c ${scriptName} -n '__fish_use_subcommand' -a 'update' -d 'Update a script from source'`,
     `complete -c ${scriptName} -n '__fish_use_subcommand' -a 'env' -d 'Show script env overrides'`,
@@ -574,15 +607,63 @@ export function completionCommand(shell?: string): void {
     `complete -c ${scriptName} -n '__fish_use_subcommand' -a 'help' -d 'Show help'`,
     `complete -c ${scriptName} -n '__fish_use_subcommand' -a 'completion' -d 'Generate shell completion'`,
     ``,
-    `complete -c ${scriptName} -n '__fish_seen_subcommand_from run rm update env show edit' -a "(${scriptName} completion --aliases 2>/dev/null)"`,
+    `complete -c ${scriptName} -n '__fish_seen_subcommand_from run rename rm update env show edit' -a "(${scriptName} completion --aliases 2>/dev/null)"`,
     `complete -c ${scriptName} -n '__fish_seen_subcommand_from add; and __fish_is_token_n 3' -F`
   ].join("\n");
+
+  const installCompletion = (targetShell: "zsh" | "fish"): void => {
+    if (!homeDir) {
+      console.error("Error: HOME is not set");
+      process.exit(1);
+    }
+
+    if (targetShell === "zsh") {
+      const completionsDir = path.join(homeDir, ".zsh", "completions");
+      const completionPath = path.join(completionsDir, "_sms");
+      const zshrcPath = path.join(homeDir, ".zshrc");
+      const zshrcSnippet = [
+        "fpath=(~/.zsh/completions $fpath)",
+        "autoload -Uz compinit",
+        "compinit",
+      ].join("\n");
+
+      fs.mkdirSync(completionsDir, { recursive: true });
+      fs.writeFileSync(completionPath, zshCompletion + "\n", "utf-8");
+
+      const existingZshrc = fs.existsSync(zshrcPath)
+        ? fs.readFileSync(zshrcPath, "utf-8")
+        : "";
+      if (!existingZshrc.includes("fpath=(~/.zsh/completions $fpath)")) {
+        const nextZshrc = existingZshrc.trimEnd();
+        const prefix = nextZshrc.length > 0 ? `${nextZshrc}\n\n` : "";
+        fs.writeFileSync(zshrcPath, `${prefix}${zshrcSnippet}\n`, "utf-8");
+      }
+
+      console.log(`Installed zsh completion to ${completionPath}`);
+      console.log(`Restart your shell or run: source ${zshrcPath}`);
+      return;
+    }
+
+    const fishDir = path.join(homeDir, ".config", "fish", "completions");
+    const fishPath = path.join(fishDir, "sms.fish");
+    fs.mkdirSync(fishDir, { recursive: true });
+    fs.writeFileSync(fishPath, fishCompletion + "\n", "utf-8");
+    console.log(`Installed fish completion to ${fishPath}`);
+  };
 
   if (shell === "--aliases") {
     // Output just the aliases (for internal use by completion scripts)
     ensureSmsRepo();
     const aliases = getAliases();
     console.log(aliases.join(" "));
+  } else if (shell === "install") {
+    const targetShell = process.argv[4];
+    if (targetShell === "zsh" || targetShell === "fish") {
+      installCompletion(targetShell);
+    } else {
+      console.error("Usage: sms completion install <zsh|fish>");
+      process.exit(1);
+    }
   } else if (shell === "zsh") {
     console.log(zshCompletion);
   } else if (shell === "fish") {
@@ -594,19 +675,29 @@ export function completionCommand(shell?: string): void {
 
 Zsh:
 ----
-1. Add to ~/.zshrc:
-   eval "$(sms completion zsh)"
+1. Install automatically:
+   sms completion install zsh
 
-2. Or save to a directory in $fpath:
-   sms completion zsh > /usr/local/share/zsh/site-functions/_sms
+2. Manual install:
+   mkdir -p ~/.zsh/completions
+   sms completion zsh > ~/.zsh/completions/_sms
+
+3. Add to ~/.zshrc:
+   fpath=(~/.zsh/completions $fpath)
+   autoload -Uz compinit
+   compinit
 
 Fish:
 -----
-1. Save to fish completions:
+1. Install automatically:
+   sms completion install fish
+
+2. Manual install:
    sms completion fish > ~/.config/fish/completions/sms.fish
 
 Available shells: zsh, fish
-Usage: sms completion <shell>`);
+Usage: sms completion <shell>
+       sms completion install <shell>`);
   }
 }
 
@@ -616,6 +707,7 @@ export function showHelp(): void {
 Usage:
   sms add <file> --alias <name> [--env "K=V,FOO=BAR"]   Add a script with an alias
   sms run [--dry-run] <alias> [args...]      Run a script by alias
+  sms rename <old> <new>           Rename a script alias
   sms rm <alias>                   Remove a script
   sms update <alias> [--env "K=V,FOO=BAR"] [--clear-env]  Update script from original source
   sms env <alias>                  Show env overrides for a script
@@ -626,20 +718,23 @@ Usage:
   sms llm                          Show LLM usage guide for SMS
   sms init <name> --type <python|ts> [--alias <name>] [--location <cwd|sms>] [--no-add] [--force]
   sms completion <shell>           Generate shell completion (zsh/fish)
+  sms completion install <shell>   Install shell completion (zsh/fish)
   sms help                         Show this help
 
 Setup Autocomplete:
-  eval "$(sms completion zsh)"      # Add to ~/.zshrc
+  sms completion install zsh
 
 Examples:
   sms add ./myscript.py --alias etl
   sms run etl --input data.csv
   sms run --dry-run etl --input data.csv
+  sms rename etl etl-prod
   sms show etl
   sms rm etl
   sms update etl
   sms update etl --clear-env
   sms env etl
+  sms completion install zsh
   sms init myscript --type python --alias etl
 `);
 }

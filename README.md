@@ -58,15 +58,76 @@ Local script execution is fragile:
 |---------|-------------|
 | `sms add <file> --alias <name> [--env "K=V,FOO=BAR"]` | Add a script with an alias |
 | `sms run [--dry-run] <alias> [args...]` | Execute a script by alias (or print execution plan) |
+| `sms rename <old> <new>` | Rename an existing alias |
 | `sms rm <alias>` | Remove a script |
 | `sms env <alias>` | Show environment overrides for a script |
 | `sms llm` | Show concise LLM usage guidance for SMS |
 | `sms init <name> --type <python|ts> [--alias <name>] [--location <cwd|sms>] [--no-add] [--force]` | Create a script template |
 | `sms list` | Show all registered scripts |
 | `sms doctor` | Detect broken paths |
+| `sms completion <shell>` | Generate shell completion for `zsh` or `fish` |
+| `sms completion install <shell>` | Install shell completion for `zsh` or `fish` |
 | `sms help` | Show help |
 
 Note: `sms update <alias> [--env "K=V,FOO=BAR"] [--clear-env]` updates or clears script env metadata.
+
+## Shell Completion
+
+Generate completion with:
+
+```sh
+sms completion zsh
+sms completion fish
+```
+
+Or install it directly:
+
+```sh
+sms completion install zsh
+sms completion install fish
+```
+
+### Zsh
+
+Automatic install:
+
+```sh
+sms completion install zsh
+```
+
+Manual install:
+
+```sh
+mkdir -p ~/.zsh/completions
+sms completion zsh > ~/.zsh/completions/_sms
+```
+
+Then add this to `~/.zshrc`:
+
+```sh
+fpath=(~/.zsh/completions $fpath)
+autoload -Uz compinit
+compinit
+```
+
+### Fish
+
+Automatic install:
+
+```sh
+sms completion install fish
+```
+
+Manual install:
+
+```sh
+sms completion fish > ~/.config/fish/completions/sms.fish
+```
+
+### Notes
+
+- `sms completion --aliases` is used internally by the completion scripts to complete registered aliases.
+- Supported shells today: `zsh`, `fish`.
 
 ## Script Writing Guidelines (LLM-Friendly)
 

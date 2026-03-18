@@ -9,6 +9,7 @@ import {
   addCommand,
   initCommand,
   runCommand,
+  renameCommand,
   rmCommand,
   updateCommand,
   envCommand,
@@ -60,6 +61,18 @@ function main(): void {
           process.exit(1);
         }
         runCommand(alias, runArgs.slice(1), dryRun);
+        break;
+      }
+
+      case "rename": {
+        const oldAlias = args[1];
+        const newAlias = args[2];
+        if (!oldAlias || !newAlias) {
+          console.error("Error: Missing alias");
+          console.error("Usage: sms rename <old> <new>");
+          process.exit(1);
+        }
+        renameCommand(oldAlias, newAlias);
         break;
       }
 
