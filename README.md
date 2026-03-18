@@ -7,7 +7,7 @@ Git-backed alias system for managing scripts. Run scripts by stable alias regard
 ```bash
 # Clone or copy this repository
 git clone <repo>
-cd sms-cli
+cd sms
 
 # Install uv (required for Python scripts)
 curl -LsSf https://astral.sh/uv/install.sh | sh
@@ -150,6 +150,76 @@ def main(argv: list[str]) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main(sys.argv[1:]))
+```
+
+#### TypeScript (Bun)
+
+```ts
+#!/usr/bin/env bun
+
+import kleur from "kleur";
+
+function usage(): void {
+  console.log(`Usage:
+  myscript [options] <input>
+
+Options:
+  -o, --output <path>   Output file (default: stdout)
+  -q, --quiet           Suppress non-error logs
+  -h, --help            Show this help
+`);
+}
+
+const args = process.argv.slice(2);
+let output: string | undefined;
+let quiet = false;
+
+while (args.length > 0) {
+  const token = args[0];
+
+  if (token === "-o" || token === "--output") {
+    if (!args[1] || args[1].startsWith("-")) {
+      console.error(`Error: Missing value for ${token}`);
+      usage();
+      process.exit(2);
+    }
+    output = args[1];
+    args.splice(0, 2);
+    continue;
+  }
+
+  if (token === "-q" || token === "--quiet") {
+    quiet = true;
+    args.splice(0, 1);
+    continue;
+  }
+
+  if (token === "-h" || token === "--help") {
+    usage();
+    process.exit(0);
+  }
+
+  if (token.startsWith("-")) {
+    console.error(`Error: Unknown option ${token}`);
+    usage();
+    process.exit(2);
+  }
+
+  break;
+}
+
+const input = args[0];
+if (!input) {
+  console.error("Error: Missing <input>");
+  usage();
+  process.exit(2);
+}
+
+if (!quiet) {
+  console.error(kleur.cyan(`Reading ${input}`));
+}
+
+console.log(JSON.stringify({ input, output: output ?? null, status: kleur.green("ok") }));
 ```
 
 ### Notes for `sms`
