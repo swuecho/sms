@@ -24,6 +24,7 @@ describe("completionCommand", () => {
 
     expect(out).toContain("#compdef sms");
     expect(out).toContain("'run:Run a script by alias'");
+    expect(out).toContain("'env:Show script env overrides'");
     expect(out).toContain("'llm:Show LLM usage guide'");
     expect(out).toContain("'completion:Generate shell completion'");
     expect(out).toContain("--type[Template type]:type:(python ts)");
@@ -33,6 +34,7 @@ describe("completionCommand", () => {
     const out = captureCompletionOutput("fish");
 
     expect(out).toContain("complete -c sms -n '__fish_use_subcommand' -a 'run'");
+    expect(out).toContain("complete -c sms -n '__fish_use_subcommand' -a 'env'");
     expect(out).toContain("complete -c sms -n '__fish_use_subcommand' -a 'llm'");
     expect(out).toContain("sms completion --aliases");
   });

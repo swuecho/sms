@@ -215,6 +215,68 @@ export function updateCommand(alias: string, env?: Record<string, string>): void
   console.log(`Updated '${alias}' from ${entry.sourcePath}`);
 }
 
+export function envCommand(alias: string): void {
+  ensureSmsRepo();
+
+  const index = loadIndex();
+  const entry = index.scripts[alias];
+
+  if (!entry) {
+    console.error(`Error: Unknown alias '${alias}'`);
+    console.error(`Run 'sms list' to see available scripts`);
+    process.exit(1);
+  }
+
+  const env = entry.env || {};
+  const keys = Object.keys(env).sort();
+
+  if (keys.length === 0) {
+    console.log(`No env overrides set for '${alias}'`);
+    return;
+  }
+
+  console.log(`Env overrides for '${alias}':`);
+  for (const key of keys) {
+    console.log(`${key}=${env[key]}`);
+  }
+}
+
+export function clearEnvCommand(alias: string): void {
+  ensureSmsRepo();
+
+  const index = loadIndex();
+  const entry = index.scripts[alias];
+
+  if (!entry) {
+    console.error(`Error: Unknown alias '${alias}'`);
+    console.error(`Run 'sms list' to see available scripts`);
+    process.exit(1);
+  }
+
+  if (!entry.sourcePath) {
+    console.error(`Error: No source path recorded for '${alias}'`);
+    console.error(`This script was added before update tracking was available.`);
+    console.error(`To clear env: remove the script and re-add it without env overrides.`);
+    process.exit(1);
+  }
+
+  if (!fs.existsSync(entry.sourcePath)) {
+    console.error(`Error: Source file not found: ${entry.sourcePath}`);
+    console.error(`The original file may have been moved or deleted.`);
+    process.exit(1);
+  }
+
+  const targetPath = path.join(SCRIPTS_DIR, entry.path);
+  fs.copyFileSync(entry.sourcePath, targetPath);
+
+  delete entry.env;
+  entry.updatedAt = new Date().toISOString();
+  saveIndex(index);
+
+  commitChanges(`Clear env for script '${alias}'`);
+  console.log(`Cleared env overrides for '${alias}'`);
+}
+
 export function showCommand(alias: string): void {
   ensureSmsRepo();
 
@@ -408,7 +470,8 @@ Use SMS to register scripts by alias and run them from anywhere.
 Core commands:
   sms add <file> --alias <name> [--env "K=V,FOO=BAR"]
   sms run [--dry-run] <alias> [args...]
-  sms update <alias> [--env "K=V,FOO=BAR"]
+  sms update <alias> [--env "K=V,FOO=BAR"] [--clear-env]
+  sms env <alias>
   sms show <alias>
   sms rm <alias>
   sms list
@@ -431,7 +494,9 @@ Examples:
   sms init etl --type python --alias etl
   sms run --dry-run etl --input data.csv
   sms run etl --input data.csv
-  sms update etl`);
+  sms update etl
+  sms update etl --clear-env
+  sms env etl`);
 }
 
 export function completionCommand(shell?: string): void {
@@ -456,6 +521,7 @@ export function completionCommand(shell?: string): void {
     `        'run:Run a script by alias'`,
     `        'rm:Remove a script'`,
     `        'update:Update a script from source'`,
+    `        'env:Show script env overrides'`,
     `        'show:Show script contents'`,
     `        'edit:Edit a script in $EDITOR'`,
     `        'list:List all scripts'`,
@@ -469,7 +535,7 @@ export function completionCommand(shell?: string): void {
     `      ;;`,
     `    args)`,
     `      case "\$line[1]" in`,
-    `        run|rm|update|show|edit)`,
+    `        run|rm|update|env|show|edit)`,
     `          local aliases=($(${scriptName} completion --aliases 2>/dev/null || echo ""))`,
     `          _describe -t aliases 'aliases' aliases`,
     `          ;;`,
@@ -498,6 +564,7 @@ export function completionCommand(shell?: string): void {
     `complete -c ${scriptName} -n '__fish_use_subcommand' -a 'run' -d 'Run a script by alias'`,
     `complete -c ${scriptName} -n '__fish_use_subcommand' -a 'rm' -d 'Remove a script'`,
     `complete -c ${scriptName} -n '__fish_use_subcommand' -a 'update' -d 'Update a script from source'`,
+    `complete -c ${scriptName} -n '__fish_use_subcommand' -a 'env' -d 'Show script env overrides'`,
     `complete -c ${scriptName} -n '__fish_use_subcommand' -a 'show' -d 'Show script contents'`,
     `complete -c ${scriptName} -n '__fish_use_subcommand' -a 'edit' -d 'Edit a script in $EDITOR'`,
     `complete -c ${scriptName} -n '__fish_use_subcommand' -a 'list' -d 'List all scripts'`,
@@ -507,7 +574,7 @@ export function completionCommand(shell?: string): void {
     `complete -c ${scriptName} -n '__fish_use_subcommand' -a 'help' -d 'Show help'`,
     `complete -c ${scriptName} -n '__fish_use_subcommand' -a 'completion' -d 'Generate shell completion'`,
     ``,
-    `complete -c ${scriptName} -n '__fish_seen_subcommand_from run rm update show edit' -a "(${scriptName} completion --aliases 2>/dev/null)"`,
+    `complete -c ${scriptName} -n '__fish_seen_subcommand_from run rm update env show edit' -a "(${scriptName} completion --aliases 2>/dev/null)"`,
     `complete -c ${scriptName} -n '__fish_seen_subcommand_from add; and __fish_is_token_n 3' -F`
   ].join("\n");
 
@@ -550,7 +617,8 @@ Usage:
   sms add <file> --alias <name> [--env "K=V,FOO=BAR"]   Add a script with an alias
   sms run [--dry-run] <alias> [args...]      Run a script by alias
   sms rm <alias>                   Remove a script
-  sms update <alias> [--env "K=V,FOO=BAR"]              Update script from original source
+  sms update <alias> [--env "K=V,FOO=BAR"] [--clear-env]  Update script from original source
+  sms env <alias>                  Show env overrides for a script
   sms show <alias>                 Show script contents
   sms edit <alias>                 Edit a script in $EDITOR
   sms list                         List all scripts
@@ -570,6 +638,8 @@ Examples:
   sms show etl
   sms rm etl
   sms update etl
+  sms update etl --clear-env
+  sms env etl
   sms init myscript --type python --alias etl
 `);
 }
