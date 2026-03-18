@@ -59,13 +59,14 @@ Local script execution is fragile:
 | `sms add <file> --alias <name> [--env "K=V,FOO=BAR"]` | Add a script with an alias |
 | `sms run [--dry-run] <alias> [args...]` | Execute a script by alias (or print execution plan) |
 | `sms rm <alias>` | Remove a script |
+| `sms env <alias>` | Show environment overrides for a script |
 | `sms llm` | Show concise LLM usage guidance for SMS |
 | `sms init <name> --type <python|ts> [--alias <name>] [--location <cwd|sms>] [--no-add] [--force]` | Create a script template |
 | `sms list` | Show all registered scripts |
 | `sms doctor` | Detect broken paths |
 | `sms help` | Show help |
 
-Note: `sms update <alias> [--env "K=V,FOO=BAR"]` updates script env metadata.
+Note: `sms update <alias> [--env "K=V,FOO=BAR"] [--clear-env]` updates or clears script env metadata.
 
 ## Script Writing Guidelines (LLM-Friendly)
 
@@ -155,6 +156,7 @@ if __name__ == "__main__":
 
 - `sms run <alias> ...` passes arguments through to your script unchanged.
 - `sms run --dry-run <alias> ...` prints the command and env overrides without executing.
+- `sms env <alias>` prints the current env overrides stored for that alias.
 - Python scripts are executed with `uv run`.
 - TypeScript scripts are executed with Bun.
 
