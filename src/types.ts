@@ -18,5 +18,7 @@ export interface DoctorResult {
   alias: string;
   path: string;
   exists: boolean;
+  kind?: "script-missing" | "source-missing";
+  sourcePath?: string;
   suggestedFix?: string;
 }

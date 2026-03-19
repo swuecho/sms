@@ -51,6 +51,7 @@ Local script execution is fragile:
 - **Path abstraction**: Scripts are referenced by alias, not file path
 - **Auto-detection**: Automatically detects Python/TypeScript scripts
 - **Health checks**: Built-in `doctor` command detects broken paths
+- **Repair guidance**: `sms doctor` suggests `sms update --source <file>` when the original source moved
 
 ## Commands
 

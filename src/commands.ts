@@ -444,14 +444,26 @@ export function doctorCommand(): void {
 
   for (const [alias, entry] of Object.entries(index.scripts)) {
     const fullPath = path.join(SCRIPTS_DIR, entry.path);
-    const exists = fs.existsSync(fullPath);
+    const scriptExists = fs.existsSync(fullPath);
 
-    if (!exists) {
+    if (!scriptExists) {
       issues.push({
         alias,
         path: entry.path,
         exists: false,
+        kind: "script-missing",
         suggestedFix: `sms rm ${alias}  # or restore the file`,
+      });
+    }
+
+    if (entry.sourcePath && !fs.existsSync(entry.sourcePath)) {
+      issues.push({
+        alias,
+        path: entry.path,
+        exists: false,
+        kind: "source-missing",
+        sourcePath: entry.sourcePath,
+        suggestedFix: `sms update ${alias} --source <new-file>`,
       });
     }
   }
@@ -489,9 +501,22 @@ export function doctorCommand(): void {
     return;
   }
 
-  if (issues.length > 0) {
-    console.log("Broken aliases (file missing):");
-    for (const issue of issues) {
+  const sourceIssues = issues.filter((issue) => issue.kind === "source-missing");
+  const scriptIssues = issues.filter((issue) => issue.kind === "script-missing");
+
+  if (sourceIssues.length > 0) {
+    console.log("Source path missing:");
+    for (const issue of sourceIssues) {
+      console.log(`  ! ${issue.alias}`);
+      console.log(`    Recorded source: ${issue.sourcePath}`);
+      console.log(`    Run: ${issue.suggestedFix}`);
+    }
+    console.log("");
+  }
+
+  if (scriptIssues.length > 0) {
+    console.log("Stored script missing:");
+    for (const issue of scriptIssues) {
       console.log(`  ✗ ${issue.alias}: ${issue.path}`);
       console.log(`    Fix: ${issue.suggestedFix}`);
     }
