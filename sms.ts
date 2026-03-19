@@ -91,22 +91,28 @@ function main(): void {
         const alias = args[1];
         if (!alias) {
           console.error("Error: Missing alias");
-          console.error("Usage: sms update <alias> [--env \"K=V,FOO=BAR\"] [--clear-env]");
+          console.error("Usage: sms update <alias> [--env \"K=V,FOO=BAR\"] [--clear-env] [--source <file>]");
           process.exit(1);
         }
         const clearEnv = args.includes("--clear-env");
         const envIdx = args.indexOf("--env");
         const envRaw = envIdx > 0 ? args[envIdx + 1] : undefined;
+        const sourceIdx = args.indexOf("--source");
+        const sourcePath = sourceIdx > 0 ? args[sourceIdx + 1] : undefined;
         if (clearEnv && envIdx > 0) {
           console.error("Error: --env and --clear-env cannot be used together");
           process.exit(2);
         }
+        if (sourceIdx > 0 && !sourcePath) {
+          console.error("Error: Missing file path after --source");
+          process.exit(2);
+        }
         if (clearEnv) {
-          clearEnvCommand(alias);
+          clearEnvCommand(alias, sourcePath);
           break;
         }
         const env = parseEnvFlag(envRaw);
-        updateCommand(alias, env);
+        updateCommand(alias, env, sourcePath);
         break;
       }
 

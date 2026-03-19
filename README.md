@@ -69,7 +69,7 @@ Local script execution is fragile:
 | `sms completion install <shell>` | Install shell completion for `zsh` or `fish` |
 | `sms help` | Show help |
 
-Note: `sms update <alias> [--env "K=V,FOO=BAR"] [--clear-env]` updates or clears script env metadata.
+Note: `sms update <alias> [--env "K=V,FOO=BAR"] [--clear-env] [--source <file>]` updates or clears script env metadata. Use `--source` when the original file moved.
 
 ## Shell Completion
 

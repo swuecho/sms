@@ -201,7 +201,7 @@ export function renameCommand(oldAlias: string, newAlias: string): void {
   console.log(`Renamed '${oldAlias}' -> '${newAlias}'`);
 }
 
-export function updateCommand(alias: string, env?: Record<string, string>): void {
+export function updateCommand(alias: string, env?: Record<string, string>, sourcePathOverride?: string): void {
   ensureSmsRepo();
 
   const index = loadIndex();
@@ -213,15 +213,17 @@ export function updateCommand(alias: string, env?: Record<string, string>): void
     process.exit(1);
   }
 
-  if (!entry.sourcePath) {
+  const sourcePath = sourcePathOverride ? path.resolve(sourcePathOverride) : entry.sourcePath;
+
+  if (!sourcePath) {
     console.error(`Error: No source path recorded for '${alias}'`);
     console.error(`This script was added before update tracking was available.`);
-    console.error(`To update: remove the script and re-add it from the new source.`);
+    console.error(`To update: use 'sms update ${alias} --source <file>' or remove and re-add it from the new source.`);
     process.exit(1);
   }
 
-  if (!fs.existsSync(entry.sourcePath)) {
-    console.error(`Error: Source file not found: ${entry.sourcePath}`);
+  if (!fs.existsSync(sourcePath)) {
+    console.error(`Error: Source file not found: ${sourcePath}`);
     console.error(`The original file may have been moved or deleted.`);
     process.exit(1);
   }
@@ -229,18 +231,20 @@ export function updateCommand(alias: string, env?: Record<string, string>): void
   const targetPath = path.join(SCRIPTS_DIR, entry.path);
 
   // Copy updated file
-  fs.copyFileSync(entry.sourcePath, targetPath);
+  fs.copyFileSync(sourcePath, targetPath);
 
   if (env) {
     entry.env = env;
   }
 
+  entry.sourcePath = sourcePath;
+
   // Update timestamp
   entry.updatedAt = new Date().toISOString();
   saveIndex(index);
 
-  commitChanges(`Update script '${alias}' from ${entry.sourcePath}`);
-  console.log(`Updated '${alias}' from ${entry.sourcePath}`);
+  commitChanges(`Update script '${alias}' from ${sourcePath}`);
+  console.log(`Updated '${alias}' from ${sourcePath}`);
 }
 
 export function envCommand(alias: string): void {
@@ -269,7 +273,7 @@ export function envCommand(alias: string): void {
   }
 }
 
-export function clearEnvCommand(alias: string): void {
+export function clearEnvCommand(alias: string, sourcePathOverride?: string): void {
   ensureSmsRepo();
 
   const index = loadIndex();
@@ -281,23 +285,26 @@ export function clearEnvCommand(alias: string): void {
     process.exit(1);
   }
 
-  if (!entry.sourcePath) {
+  const sourcePath = sourcePathOverride ? path.resolve(sourcePathOverride) : entry.sourcePath;
+
+  if (!sourcePath) {
     console.error(`Error: No source path recorded for '${alias}'`);
     console.error(`This script was added before update tracking was available.`);
-    console.error(`To clear env: remove the script and re-add it without env overrides.`);
+    console.error(`To clear env: use 'sms update ${alias} --clear-env --source <file>' or remove and re-add it without env overrides.`);
     process.exit(1);
   }
 
-  if (!fs.existsSync(entry.sourcePath)) {
-    console.error(`Error: Source file not found: ${entry.sourcePath}`);
+  if (!fs.existsSync(sourcePath)) {
+    console.error(`Error: Source file not found: ${sourcePath}`);
     console.error(`The original file may have been moved or deleted.`);
     process.exit(1);
   }
 
   const targetPath = path.join(SCRIPTS_DIR, entry.path);
-  fs.copyFileSync(entry.sourcePath, targetPath);
+  fs.copyFileSync(sourcePath, targetPath);
 
   delete entry.env;
+  entry.sourcePath = sourcePath;
   entry.updatedAt = new Date().toISOString();
   saveIndex(index);
 
@@ -511,7 +518,7 @@ Core commands:
   sms add <file> --alias <name> [--env "K=V,FOO=BAR"]
   sms run [--dry-run] <alias> [args...]
   sms rename <old> <new>
-  sms update <alias> [--env "K=V,FOO=BAR"] [--clear-env]
+  sms update <alias> [--env "K=V,FOO=BAR"] [--clear-env] [--source <file>]
   sms env <alias>
   sms show <alias>
   sms rm <alias>
@@ -537,7 +544,8 @@ Examples:
   sms run etl --input data.csv
   sms rename etl etl-prod
   sms update etl
-  sms update etl --clear-env
+  sms update etl --source ~/work/new-etl.py
+  sms update etl --clear-env --source ~/work/new-etl.py
   sms env etl`);
 }
 
@@ -721,7 +729,7 @@ Usage:
   sms run [--dry-run] <alias> [args...]      Run a script by alias
   sms rename <old> <new>           Rename a script alias
   sms rm <alias>                   Remove a script
-  sms update <alias> [--env "K=V,FOO=BAR"] [--clear-env]  Update script from original source
+  sms update <alias> [--env "K=V,FOO=BAR"] [--clear-env] [--source <file>]  Update script from original source or replace source path
   sms env <alias>                  Show env overrides for a script
   sms show <alias>                 Show script contents
   sms edit <alias>                 Edit a script in $EDITOR
@@ -744,7 +752,8 @@ Examples:
   sms show etl
   sms rm etl
   sms update etl
-  sms update etl --clear-env
+  sms update etl --source ~/work/new-etl.py
+  sms update etl --clear-env --source ~/work/new-etl.py
   sms env etl
   sms completion install zsh
   sms init myscript --type python --alias etl
