@@ -1,0 +1,70 @@
+name: Release Binaries
+
+on:
+  release:
+    types:
+      - published
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.3
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Run tests
+        run: bun test
+
+      - name: Build release binaries
+        env:
+          VERSION: ${{ github.event.release.tag_name || github.ref_name }}
+        run: |
+          mkdir -p dist/staging/linux-x64
+          mkdir -p dist/staging/macos-x64
+          mkdir -p dist/staging/macos-arm64
+          mkdir -p dist/staging/windows-x64
+
+          bun build sms.ts --compile --target=bun-linux-x64-baseline --outfile=dist/staging/linux-x64/sms
+          bun build sms.ts --compile --target=bun-darwin-x64 --outfile=dist/staging/macos-x64/sms
+          bun build sms.ts --compile --target=bun-darwin-arm64 --outfile=dist/staging/macos-arm64/sms
+          bun build sms.ts --compile --target=bun-windows-x64-baseline --outfile=dist/staging/windows-x64/sms.exe
+
+          tar -C dist/staging/linux-x64 -czf dist/sms-${VERSION}-linux-x64.tar.gz sms
+          tar -C dist/staging/macos-x64 -czf dist/sms-${VERSION}-macos-x64.tar.gz sms
+          tar -C dist/staging/macos-arm64 -czf dist/sms-${VERSION}-macos-arm64.tar.gz sms
+          (
+            cd dist/staging/windows-x64
+            zip -q ../../sms-${VERSION}-windows-x64.zip sms.exe
+          )
+
+          sha256sum \
+            dist/sms-${VERSION}-linux-x64.tar.gz \
+            dist/sms-${VERSION}-macos-x64.tar.gz \
+            dist/sms-${VERSION}-macos-arm64.tar.gz \
+            dist/sms-${VERSION}-windows-x64.zip \
+            > dist/sms-${VERSION}-checksums.txt
+
+      - name: Upload workflow artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: sms-release-binaries
+          path: dist/*
+
+      - name: Upload release assets
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
