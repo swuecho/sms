@@ -10,20 +10,30 @@ import { SMS_DIR, SCRIPTS_DIR, INDEX_PATH } from "./config";
 import type { Index } from "./types";
 
 export function ensureSmsRepo(): void {
-  if (!fs.existsSync(SMS_DIR)) {
-    fs.mkdirSync(SMS_DIR, { recursive: true });
-    fs.mkdirSync(SCRIPTS_DIR, { recursive: true });
+  const smsDirExists = fs.existsSync(SMS_DIR);
+  const gitDir = path.join(SMS_DIR, ".git");
+  const gitExists = fs.existsSync(gitDir);
+  const indexExists = fs.existsSync(INDEX_PATH);
 
-    // Initialize git repo
+  fs.mkdirSync(SMS_DIR, { recursive: true });
+  fs.mkdirSync(SCRIPTS_DIR, { recursive: true });
+
+  if (!gitExists) {
     git("init");
     git("config", "user.email", "sms@localhost");
     git("config", "user.name", "SMS");
+  }
 
-    // Create initial index
+  if (!indexExists) {
     saveIndex({ version: "1.0.0", scripts: {} });
+  }
 
+  if (!gitExists) {
     git("add", ".");
     git("commit", "-m", "Initial SMS setup");
+  }
+
+  if (!smsDirExists) {
     console.log(`Initialized SMS repository at ${SMS_DIR}`);
   }
 }
@@ -72,6 +82,7 @@ export function getScriptType(filePath: string): "python" | "bun" | "unknown" {
     const content = fs.readFileSync(filePath, "utf-8");
     const firstLine = content.split("\n")[0] || "";
     if (firstLine.includes("python")) return "python";
+    if (firstLine.includes("uv") && firstLine.includes("run")) return "python";
     if (firstLine.includes("bun")) return "bun";
   } catch {
     // ignore
@@ -85,8 +96,8 @@ export function executeScript(
   env?: Record<string, string>,
   dryRun: boolean = false
 ): void {
-  const type = getScriptType(scriptPath);
   const fullPath = path.join(SMS_DIR, "scripts", scriptPath);
+  const type = getScriptType(fullPath);
 
   if (!fs.existsSync(fullPath)) {
     console.error(`Error: Script not found at ${fullPath}`);
@@ -138,6 +149,15 @@ export function executeScript(
     env: { ...process.env, ...(env || {}) },
   });
 
+  child.on("error", (error) => {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+      console.error(`Error: Failed to start '${command}'. Is it installed and on PATH?`);
+      process.exit(1);
+    }
+    console.error(`Error: Failed to start '${command}': ${error.message}`);
+    process.exit(1);
+  });
+
   child.on("close", (code) => {
     process.exit(code ?? 0);
   });
@@ -168,29 +188,6 @@ export function generateUniqueFileName(originalPath: string, fileName: string): 
   }
 
   return finalFileName;
-}
-
-export function parseEnvFlag(raw?: string): Record<string, string> | undefined {
-  if (!raw) return undefined;
-  const env: Record<string, string> = {};
-  const entries = raw.split(",");
-  for (const entry of entries) {
-    const trimmed = entry.trim();
-    if (!trimmed) continue;
-    const eqIdx = trimmed.indexOf("=");
-    if (eqIdx <= 0) {
-      console.error(`Error: Invalid env entry '${trimmed}'. Use KEY=VALUE.`);
-      process.exit(2);
-    }
-    const key = trimmed.slice(0, eqIdx).trim();
-    const value = trimmed.slice(eqIdx + 1).trim();
-    if (!key) {
-      console.error(`Error: Invalid env entry '${trimmed}'. Use KEY=VALUE.`);
-      process.exit(2);
-    }
-    env[key] = value;
-  }
-  return Object.keys(env).length > 0 ? env : undefined;
 }
 
 export function getAliases(): string[] {

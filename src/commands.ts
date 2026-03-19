@@ -363,11 +363,23 @@ export function editCommand(alias: string): void {
 
   // Determine editor
   const editor = process.env.EDITOR || process.env.VISUAL || "vi";
+  const shell = process.env.SHELL || "/bin/sh";
+  const shellQuote = (value: string): string => `'${value.replace(/'/g, `'\\''`)}'`;
 
   // Open editor
-  const child = spawn(editor, [scriptPath], {
+  const child = spawn(shell, ["-lc", `${editor} ${shellQuote(scriptPath)}`], {
     stdio: "inherit",
     detached: false,
+  });
+
+  child.on("error", (error) => {
+    const errno = error as NodeJS.ErrnoException;
+    if (errno.code === "ENOENT") {
+      console.error(`Error: Failed to start editor shell '${shell}'.`);
+      process.exit(1);
+    }
+    console.error(`Error: Failed to start editor: ${error.message}`);
+    process.exit(1);
   });
 
   child.on("close", (code) => {
