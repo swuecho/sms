@@ -3,12 +3,12 @@ import { mkdtempSync, rmSync, writeFileSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
 
-const repoRoot = "/Users/hwu/dev/sms";
+const repoRoot = join(import.meta.dir, "..");
 const tempDirs: string[] = [];
 
 function runSms(args: string[], homeDir: string) {
   return Bun.spawnSync({
-    cmd: ["bun", "sms.ts", ...args],
+    cmd: [process.execPath, "sms.ts", ...args],
     cwd: repoRoot,
     env: { ...process.env, HOME: homeDir },
     stdout: "pipe",
