@@ -15,7 +15,7 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Bun
         uses: oven-sh/setup-bun@v2
@@ -58,13 +58,13 @@ jobs:
             > dist/sms-${VERSION}-checksums.txt
 
       - name: Upload workflow artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: sms-release-binaries
           path: dist/*
 
       - name: Upload release assets
         if: github.event_name == 'release'
-        uses: softprops/action-gh-release@v2
-        with:
-          files: dist/*
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "${{ github.event.release.tag_name }}" dist/* --clobber
