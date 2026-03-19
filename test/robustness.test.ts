@@ -3,7 +3,7 @@ import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync
 import { join } from "path";
 import { tmpdir } from "os";
 
-const repoRoot = "/Users/hwu/dev/sms";
+const repoRoot = join(import.meta.dir, "..");
 const tempDirs: string[] = [];
 
 function runSms(args: string[], homeDir: string, extraEnv: Record<string, string> = {}) {
